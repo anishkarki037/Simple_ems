@@ -111,14 +111,11 @@ router.delete("/positions/:id", verifyToken, isAdmin, async (req, res) => {
 // --- Employees CRUD ---
 router.get("/employees", verifyToken, isAdmin, async (req, res) => {
   try {
-    // First, let's try a simple query to check if the users table exists and has data
     console.log("Attempting to fetch employees...");
     
-    // Simple query first
     const [users] = await db.query("SELECT * FROM users WHERE role = 'employee'");
     console.log("Found users:", users.length);
     
-    // If users exist, try the full query with joins
     if (users.length > 0) {
       const [rows] = await db.query(
         `SELECT u.id, u.name, u.email, u.department_id, u.position_id, u.phone, u.photo, u.salary,
@@ -133,7 +130,7 @@ router.get("/employees", verifyToken, isAdmin, async (req, res) => {
       console.log("Successfully fetched employees with joins:", rows.length);
       res.json(rows);
     } else {
-      // If no employees exist, return empty array
+      
       console.log("No employees found");
       res.json([]);
     }
@@ -143,7 +140,7 @@ router.get("/employees", verifyToken, isAdmin, async (req, res) => {
     console.error("Error code:", err.code);
     console.error("Error stack:", err.stack);
     
-    // Try a fallback simple query
+
     try {
       console.log("Trying fallback query...");
       const [fallbackRows] = await db.query("SELECT id, name, email, role FROM users WHERE role = 'employee'");
@@ -208,7 +205,7 @@ router.put("/employees/:id", verifyToken, isAdmin, async (req, res) => {
       return res.status(400).json({ msg: "Please provide all required fields (name, email, department, position)" });
     }
 
-    // Check if email already exists for other users
+    // Check if email already exists
     const [existingUser] = await db.query("SELECT id FROM users WHERE email = ? AND id != ?", [email, id]);
     if (existingUser.length > 0) {
       return res.status(400).json({ msg: "Email already exists for another user" });
@@ -248,8 +245,28 @@ router.delete("/employees/:id", verifyToken, isAdmin, async (req, res) => {
       return res.status(404).json({ msg: "Employee not found" });
     }
 
+    // Check if salaries exist
+    const [salaries] = await db.query("SELECT id FROM salaries WHERE user_id = ?", [id]);
+    if (salaries.length > 0) {
+      return res.status(400).json({ msg: "Cannot delete employee with existing salary records" });
+    }
+
+    // Check if leaves exist
+    const [leaves] = await db.query("SELECT id FROM leaves WHERE user_id = ?", [id]);
+    if (leaves.length > 0) {
+      return res.status(400).json({ msg: "Cannot delete employee with existing leave records" });
+    }
+
+    // Check if attendance records exist
+    const [attendance] = await db.query("SELECT id FROM attendance WHERE user_id = ?", [id]);
+    if (attendance.length > 0) {
+      return res.status(400).json({ msg: "Cannot delete employee with existing attendance records" });
+    }
+
+    // If no linked records, delete employee
     await db.query("DELETE FROM users WHERE id=?", [id]);
     res.json({ msg: "Employee deleted successfully" });
+    
   } catch (err) {
     console.error("Error deleting employee:", err);
     res.status(500).json({ msg: "Failed to delete employee" });
@@ -321,7 +338,7 @@ router.post("/salaries", verifyToken, isAdmin, async (req, res) => {
       return res.status(400).json({ msg: "Please provide user_id, month, and year" });
     }
 
-    // Fetch employee's basic salary from users table
+    // Fetch employee's base salary from users table
     const [employee] = await db.query(
       "SELECT id, salary FROM users WHERE id = ? AND role = 'employee'",
       [user_id]
@@ -333,7 +350,7 @@ router.post("/salaries", verifyToken, isAdmin, async (req, res) => {
 
     const basicSalary = parseFloat(employee[0].salary) || 0.00;
 
-    // Check if salary record already exists for this employee in this month/year
+    // Check if salary record already exists for the employee in this month/year
     const [existingSalary] = await db.query(
       "SELECT id FROM salaries WHERE user_id = ? AND month = ? AND year = ?", 
       [user_id, month, year]

@@ -119,17 +119,17 @@ export default function Employees() {
   };
 
   // Delete employee
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this employee?")) {
-      try {
-        await API.delete(`/admin/employees/${id}`);
-        toast.info("Employee deleted");
-        fetchEmployees();
-      } catch (err) {
-        toast.error("Failed to delete employee");
-      }
+ const handleDelete = async (id) => {
+  if (window.confirm("Are you sure you want to delete this employee?")) {
+    try {
+      await API.delete(`/admin/employees/${id}`);
+      toast.info("Employee deleted");
+      fetchEmployees();
+    } catch (err) {
+      toast.error(err.response?.data?.msg || "Failed to delete employee");
     }
-  };
+  }
+};
 
   // Open add modal
   const handleAddNew = () => {
